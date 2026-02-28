@@ -29,42 +29,57 @@ export default function AssetDetail() {
             try {
                 // Fetch current user holding if it exists
                 if (user) {
-                    const { data: holdingData } = await supabase
-                        .from('holdings')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .eq('ticker', ticker)
-                        .single();
+                    try {
+                        const { data: holdingData } = await supabase
+                            .from('holdings')
+                            .select('*')
+                            .eq('user_id', user.id)
+                            .eq('ticker', ticker)
+                            .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 when no row exists
 
-                    if (holdingData) {
-                        setHolding(holdingData);
+                        if (holdingData) {
+                            setHolding(holdingData);
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch holding, continuing:", e);
                     }
                 }
 
                 // Fetch current quote
-                const quotesData = await fetchQuotes([ticker]);
-                if (quotesData.length > 0) {
-                    setQuote(quotesData[0]);
+                try {
+                    const quotesData = await fetchQuotes([ticker]);
+                    if (quotesData.length > 0) {
+                        setQuote(quotesData[0]);
+                    }
+                } catch (e) {
+                    console.warn("Could not fetch quote:", e);
                 }
 
                 // Fetch chart data
-                // Determine interval based on range
-                let interval: Interval = '1d';
-                if (activeRange === '1d') interval = '5m';
-                else if (activeRange === '5d') interval = '15m';
-                else if (activeRange === '1mo') interval = '1d';
-                else if (['3mo', '6mo', 'ytd', '1y'].includes(activeRange)) interval = '1d';
-                else interval = '1wk';
+                try {
+                    let interval: Interval = '1d';
+                    if (activeRange === '1d') interval = '5m';
+                    else if (activeRange === '5d') interval = '15m';
+                    else if (activeRange === '1mo') interval = '1d';
+                    else if (['3mo', '6mo', 'ytd', '1y'].includes(activeRange)) interval = '1d';
+                    else interval = '1wk';
 
-                const rawChartData = await fetchChartData(ticker, activeRange, interval);
-                if (rawChartData) {
-                    setChartData(processChartDataForRecharts(rawChartData));
+                    const rawChartData = await fetchChartData(ticker, activeRange, interval);
+                    if (rawChartData) {
+                        setChartData(processChartDataForRecharts(rawChartData));
+                    }
+                } catch (e) {
+                    console.warn("Could not fetch chart data:", e);
                 }
 
                 // Fetch key statistics (P/E, EPS, etc.)
-                const stats = await fetchKeyStats(ticker);
-                if (stats) {
-                    setKeyStats(stats);
+                try {
+                    const stats = await fetchKeyStats(ticker);
+                    if (stats) {
+                        setKeyStats(stats);
+                    }
+                } catch (e) {
+                    console.warn("Could not fetch key stats:", e);
                 }
 
             } catch (e) {
