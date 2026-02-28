@@ -112,7 +112,13 @@ export async function fetchKeyStats(ticker: string) {
         const priceData = result.price || {};
 
         // Helper: Yahoo v10 wraps numbers as {raw: 123, fmt: "123"}
-        const raw = (v: any) => v?.raw ?? v ?? null;
+        // Empty objects {} are returned for missing fields — must return null for those
+        const raw = (v: any): number | null => {
+            if (v == null) return null;
+            if (typeof v === 'number') return v;
+            if (typeof v === 'object' && 'raw' in v && v.raw != null) return v.raw;
+            return null;
+        };
 
         return {
             // Valuation
