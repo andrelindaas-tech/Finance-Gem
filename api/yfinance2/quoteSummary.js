@@ -1,58 +1,66 @@
-// Vercel Serverless Function: Fetch Yahoo v10 QuoteSummary with proper crumb auth
-// Uses undici with increased maxHeaderSize to bypass Node's header overflow crash
+const https = require('https');
 
-import { request } from 'undici';
-
-// Cache crumb+cookie across invocations within the same serverless instance
+// Cache crumb+cookie across warm invocations
 let cachedSession = null;
 let sessionExpiry = 0;
 
-async function getYahooCrumb() {
-    // Return cached session if still valid (cache for 5 minutes)
-    if (cachedSession && Date.now() < sessionExpiry) {
-        return cachedSession;
-    }
+function getYahooCrumb() {
+    return new Promise((resolve, reject) => {
+        // Use Node's native https with maxHeaderSize to handle Yahoo's massive tracking headers
+        const options = {
+            hostname: 'finance.yahoo.com',
+            path: '/',
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            },
+            maxHeaderSize: 65536, // 64KB - Yahoo sends enormous tracking headers
+        };
 
-    // Step 1: Hit Yahoo homepage with undici (supports maxHeaderSize option)
-    const homepageRes = await request('https://finance.yahoo.com', {
-        method: 'GET',
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        },
-        maxHeaderSize: 65536, // 64KB - Yahoo sends massive tracking headers
+        const req = https.request(options, (res) => {
+            // We only need the cookies, drain the body
+            res.resume();
+
+            const setCookies = res.headers['set-cookie'];
+            if (!setCookies) {
+                reject(new Error('No cookies received from Yahoo'));
+                return;
+            }
+
+            const cookieString = setCookies.map(c => c.split(';')[0]).join('; ');
+
+            // Step 2: Get crumb using the cookie
+            const crumbOptions = {
+                hostname: 'query1.finance.yahoo.com',
+                path: '/v1/test/getcrumb',
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Cookie': cookieString,
+                },
+            };
+
+            const crumbReq = https.request(crumbOptions, (crumbRes) => {
+                let crumb = '';
+                crumbRes.on('data', d => crumb += d);
+                crumbRes.on('end', () => {
+                    if (!crumb || crumb.includes('Unauthorized') || crumb.includes('<')) {
+                        reject(new Error('Failed to obtain crumb: ' + crumb.substring(0, 100)));
+                        return;
+                    }
+                    resolve({ cookie: cookieString, crumb });
+                });
+            });
+            crumbReq.on('error', reject);
+            crumbReq.end();
+        });
+
+        req.on('error', reject);
+        req.end();
     });
-
-    // Consume the body to avoid memory leak
-    await homepageRes.body.dump();
-
-    // Extract cookies from set-cookie headers
-    const setCookies = homepageRes.headers['set-cookie'];
-    if (!setCookies) throw new Error('No cookies received from Yahoo');
-
-    const cookieArray = Array.isArray(setCookies) ? setCookies : [setCookies];
-    const cookieString = cookieArray.map(c => c.split(';')[0]).join('; ');
-
-    // Step 2: Use the cookie to get a valid crumb
-    const crumbRes = await request('https://query1.finance.yahoo.com/v1/test/getcrumb', {
-        method: 'GET',
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Cookie': cookieString,
-        },
-    });
-
-    const crumb = await crumbRes.body.text();
-
-    if (!crumb || crumb.includes('Unauthorized')) {
-        throw new Error('Failed to obtain crumb');
-    }
-
-    cachedSession = { cookie: cookieString, crumb };
-    sessionExpiry = Date.now() + 5 * 60 * 1000; // Cache for 5 minutes
-    return cachedSession;
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     const { ticker } = req.query;
 
     if (!ticker) {
@@ -60,44 +68,44 @@ export default async function handler(req, res) {
     }
 
     try {
-        const session = await getYahooCrumb();
+        // Return cached session if still valid
+        if (!cachedSession || Date.now() >= sessionExpiry) {
+            cachedSession = await getYahooCrumb();
+            sessionExpiry = Date.now() + 5 * 60 * 1000; // Cache 5 min
+        }
 
-        // Step 3: Fetch the actual quoteSummary with crumb auth
+        // Fetch v10 quoteSummary with crumb auth
         const modules = 'defaultKeyStatistics,summaryDetail,financialData,price';
-        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}&crumb=${encodeURIComponent(session.crumb)}`;
+        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}&crumb=${encodeURIComponent(cachedSession.crumb)}`;
 
-        const dataRes = await request(url, {
-            method: 'GET',
+        const dataRes = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Cookie': session.cookie,
+                'Cookie': cachedSession.cookie,
             },
         });
 
-        const rawText = await dataRes.body.text();
-
-        if (dataRes.statusCode === 401) {
-            // Crumb expired, clear cache and retry once
+        if (dataRes.status === 401) {
+            // Crumb expired, clear cache
             cachedSession = null;
             sessionExpiry = 0;
-            return res.status(401).json({ error: 'Yahoo auth expired, retry' });
+            return res.status(401).json({ error: 'Yahoo auth expired, please retry' });
         }
 
-        if (dataRes.statusCode !== 200) {
-            return res.status(dataRes.statusCode).json({ error: `Yahoo returned ${dataRes.statusCode}` });
+        if (!dataRes.ok) {
+            return res.status(dataRes.status).json({ error: `Yahoo returned ${dataRes.status}` });
         }
 
-        const data = JSON.parse(rawText);
+        const data = await dataRes.json();
 
         // Aggressively cache — fundamentals don't change by the second
         res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
         res.status(200).json(data);
 
     } catch (error) {
-        console.error('Yahoo QuoteSummary v10 error:', error);
-        // Clear session cache on any error
+        console.error('Yahoo QuoteSummary error:', error);
         cachedSession = null;
         sessionExpiry = 0;
         res.status(500).json({ error: String(error) });
     }
-}
+};
