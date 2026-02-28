@@ -136,11 +136,12 @@ export function AddAssetModal({ isOpen, onClose, onSuccess }: AddAssetModalProps
                                                     className="w-full text-left p-4 rounded-xl hover:bg-secondary/50 border border-transparent hover:border-border transition-colors flex justify-between items-center group"
                                                 >
                                                     <div>
-                                                        <p className="font-semibold group-hover:text-primary transition-colors">{r.symbol}</p>
-                                                        <p className="text-sm text-muted-foreground line-clamp-1">{r.shortname || r.longname}</p>
+                                                        <p className="font-semibold group-hover:text-primary transition-colors">{r.longname || r.shortname || r.symbol}</p>
+                                                        <p className="text-sm text-muted-foreground line-clamp-1">{r.symbol}</p>
                                                     </div>
-                                                    <div className="text-right">
+                                                    <div className="text-right flex flex-col items-end space-y-1">
                                                         <p className="text-xs font-medium bg-secondary px-2 py-1 rounded text-muted-foreground uppercase">{r.exchDisp}</p>
+                                                        {r.typeDisp && <p className="text-[10px] text-muted-foreground/60">{r.typeDisp}</p>}
                                                     </div>
                                                 </button>
                                             ))}
