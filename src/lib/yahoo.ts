@@ -2,9 +2,7 @@
 // In development, we use Vite's proxy (/api/yahoo) to bypass CORS.
 // For production, this should point to a backend or a serverless function.
 
-const YAHOO_BASE_URL = import.meta.env.PROD
-    ? 'https://query1.finance.yahoo.com' // NOTE: Direct calls will fail in production due to CORS. You will need a backend proxy.
-    : '/api/yahoo';
+const YAHOO_BASE_URL = '/api/yahoo';
 
 export type Interval = '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m' | '1h' | '1d' | '5d' | '1wk' | '1mo' | '3mo';
 export type Range = '1d' | '5d' | '1wk' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '3y' | '5y' | '10y' | 'ytd' | 'max';
