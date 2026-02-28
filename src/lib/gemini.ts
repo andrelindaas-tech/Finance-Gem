@@ -1,5 +1,5 @@
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export interface TopPick {
     ticker: string;
@@ -17,7 +17,7 @@ export interface ArcticInsightResponse {
     source: string;
 }
 
-const ARCTIC_PROMPT = `Du er en finansanalytiker-assistent. Sjekk om Arctic Securities har oppdatert sin "Top Picks"-liste nylig. 
+export const ARCTIC_PROMPT = `Du er en finansanalytiker-assistent. Sjekk om Arctic Securities har oppdatert sin "Top Picks"-liste nylig. 
 
 Gi meg en strukturert JSON-respons med følgende format (og BARE JSON, ingen annen tekst):
 {
