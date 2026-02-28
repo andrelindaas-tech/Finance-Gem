@@ -46,67 +46,6 @@ Viktige regler:
 - Returner KUN gyldig JSON, ingen markdown, ingen kodeblokker, ingen forklaringer`;
 
 export async function fetchArcticTopPicks(): Promise<ArcticInsightResponse> {
-    // ----------------------------------------------------------------------
-    // TEMPORARY MOCK DATA
-    // Due to active development hitting Gemini's API aggressively, the
-    // free tier quota was temporarily exceeded (HTTP 429). Returning mock
-    // data to unblock UI development for the Insights page.
-    // Uncomment the real fetch below when the rate limit expires.
-    // ----------------------------------------------------------------------
-    console.warn("[MOCK MODE] Returning fake Arctic Securities data due to Gemini rate limits");
-
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    return {
-        picks: [
-            {
-                ticker: 'DOFG.OL',
-                name: 'DOF Group ASA',
-                isNew: true,
-                change: 'Ny',
-                reasoning: 'Sterk ordreinngang og posisjonering i et stramt marked for subsea-tjenester. Selskapet leverer over forventning på marginer.',
-                sentiment: 'bullish'
-            },
-            {
-                ticker: 'EQNR.OL',
-                name: 'Equinor ASA',
-                isNew: false,
-                change: 'Opp',
-                reasoning: 'Oppjusterer kursmål basert på vedvarende høye gasspriser i Europa og solid fri kontantstrøm. Utbyttekapasiteten er enorm.',
-                sentiment: 'bullish'
-            },
-            {
-                ticker: 'NAS.OL',
-                name: 'Norwegian Air Shuttle',
-                isNew: false,
-                change: 'Ned',
-                reasoning: 'Reduserer vektingen noe på grunn av usikkerhet rundt drivstoffpriser på kort sikt, men den langsiktige trenden ser fremdeles sterk ut.',
-                sentiment: 'neutral'
-            },
-            {
-                ticker: 'YAR.OL',
-                name: 'Yara International',
-                isNew: false,
-                change: 'Ut',
-                reasoning: 'Tatt ut av Top Picks-porteføljen på grunn av lavere gjødselpriser og krevende europeiske gassmarkeder. Venter på bedre visibilitet.',
-                sentiment: 'bearish'
-            },
-            {
-                ticker: 'SUBC.OL',
-                name: 'Subsea 7 S.A.',
-                isNew: false,
-                change: 'Uendret',
-                reasoning: 'Beholdes i porteføljen. Selskapet fortsetter å vinne store kontrakter, spesielt innen fornybar energi offshore.',
-                sentiment: 'bullish'
-            }
-        ],
-        summary: 'Denne måneden tar vi inn DOF Group som et nytt spennende case i subsea-markedet. Yara tas ut av porteføljen grunnet utfordrende markedsforhold for gjødsel.',
-        date: new Date().toISOString().split('T')[0],
-        source: 'Arctic Securities Top Picks (Mocked Data)'
-    };
-
-    /* --- REAL IMPLEMENTATION (Commented out) ---
     if (!GEMINI_API_KEY) {
         throw new Error('Gemini API key is not configured');
     }
@@ -163,5 +102,4 @@ export async function fetchArcticTopPicks(): Promise<ArcticInsightResponse> {
         console.error('Failed to parse Gemini response:', textContent);
         throw new Error('Kunne ikke tolke svaret fra Gemini');
     }
-    */
 }

@@ -95,48 +95,6 @@ export function processChartDataForRecharts(chartData: any) {
  * This bypasses CORS and securely handles Yahoo's crumb authentication.
  */
 export async function fetchKeyStats(ticker: string) {
-    // ----------------------------------------------------------------------
-    // TEMPORARY MOCK DATA
-    // Due to active development hitting Yahoo's API aggressively, the IP
-    // was temporarily rate-limited (HTTP 429). Returning mock data to
-    // unblock UI development.
-    // Uncomment the real fetch below when the rate limit expires.
-    // ----------------------------------------------------------------------
-    console.warn(`[MOCK MODE] Returning fake key stats for ${ticker} due to Yahoo rate limits`);
-
-    return {
-        // Valuation
-        marketCap: ticker === 'DOFG.OL' ? 15280000000 : 850000000,
-        pe: 14.2,
-        forwardPe: 12.8,
-        pb: 1.5,
-        ps: 2.1,
-        peg: 1.1,
-
-        // Per Share
-        eps: 8.54,
-        bookValue: 56.40,
-
-        // Dividends
-        dividendYield: 0.042, // 4.2%
-        dividendPerShare: 3.50,
-
-        // Revenue / Profitability
-        revenue: ticker === 'DOFG.OL' ? 12400000000 : 450000000,
-        ebitda: ticker === 'DOFG.OL' ? 4200000000 : 120000000,
-        profitMargin: 0.18, // 18%
-
-        // 52-week
-        fiftyTwoWeekHigh: 115.50,
-        fiftyTwoWeekLow: 75.20,
-
-        // Other
-        beta: 1.25,
-        shortName: ticker === 'DOFG.OL' ? 'DOF Group ASA' : ticker,
-        currency: 'NOK',
-    };
-
-    /* --- REAL IMPLEMENTATION (Commented out) ---
     try {
         const response = await fetch(`/api/yfinance2/quoteSummary?ticker=${ticker}`);
 
@@ -188,7 +146,6 @@ export async function fetchKeyStats(ticker: string) {
         console.error('Yahoo Finance 2 Proxy Error (Key Stats):', error);
         return null;
     }
-    */
 }
 
 /**
