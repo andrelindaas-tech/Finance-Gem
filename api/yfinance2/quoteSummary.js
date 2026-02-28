@@ -1,3 +1,57 @@
+// Vercel Serverless Function: Fetch Yahoo v10 QuoteSummary with proper crumb auth
+// Uses undici with increased maxHeaderSize to bypass Node's header overflow crash
+
+import { request } from 'undici';
+
+// Cache crumb+cookie across invocations within the same serverless instance
+let cachedSession = null;
+let sessionExpiry = 0;
+
+async function getYahooCrumb() {
+    // Return cached session if still valid (cache for 5 minutes)
+    if (cachedSession && Date.now() < sessionExpiry) {
+        return cachedSession;
+    }
+
+    // Step 1: Hit Yahoo homepage with undici (supports maxHeaderSize option)
+    const homepageRes = await request('https://finance.yahoo.com', {
+        method: 'GET',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        },
+        maxHeaderSize: 65536, // 64KB - Yahoo sends massive tracking headers
+    });
+
+    // Consume the body to avoid memory leak
+    await homepageRes.body.dump();
+
+    // Extract cookies from set-cookie headers
+    const setCookies = homepageRes.headers['set-cookie'];
+    if (!setCookies) throw new Error('No cookies received from Yahoo');
+
+    const cookieArray = Array.isArray(setCookies) ? setCookies : [setCookies];
+    const cookieString = cookieArray.map(c => c.split(';')[0]).join('; ');
+
+    // Step 2: Use the cookie to get a valid crumb
+    const crumbRes = await request('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+        method: 'GET',
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Cookie': cookieString,
+        },
+    });
+
+    const crumb = await crumbRes.body.text();
+
+    if (!crumb || crumb.includes('Unauthorized')) {
+        throw new Error('Failed to obtain crumb');
+    }
+
+    cachedSession = { cookie: cookieString, crumb };
+    sessionExpiry = Date.now() + 5 * 60 * 1000; // Cache for 5 minutes
+    return cachedSession;
+}
+
 export default async function handler(req, res) {
     const { ticker } = req.query;
 
@@ -6,51 +60,44 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Yahoo's tracking headers are now so large they crash Node.js's native HTTP parser via HPE_HEADER_OVERFLOW.
-        // So scraping cookies/crumbs to access the v10 fundamental data is impossible on Vercel without a headless browser.
-        // We fall back to the v8 Chart endpoint, which is unauthenticated and still provides live price and basic meta.
+        const session = await getYahooCrumb();
 
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        };
+        // Step 3: Fetch the actual quoteSummary with crumb auth
+        const modules = 'defaultKeyStatistics,summaryDetail,financialData,price';
+        const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}&crumb=${encodeURIComponent(session.crumb)}`;
 
-        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`;
-
-        const priceRes = await fetch(yahooUrl, { headers });
-
-        if (!priceRes.ok) {
-            throw new Error(`Yahoo v8 returned ${priceRes.status}`);
-        }
-
-        const priceData = await priceRes.json();
-        const baseResult = priceData?.chart?.result?.[0]?.meta;
-
-        if (!baseResult) {
-            throw new Error('Could not parse Yahoo v8 response');
-        }
-
-        // Map it to exactly what the frontend expects
-        // Key Stats will be null, but the UI handles this gracefully and the Dashboard will show correct prices.
-        const mappedData = {
-            price: {
-                regularMarketPrice: baseResult.regularMarketPrice || null,
-                regularMarketChangePercent: null, // Requires logic processing on frontend or charting endpoint
-                regularMarketVolume: baseResult.regularMarketVolume || null,
-                currency: baseResult.currency || 'NOK',
-                shortName: ticker,
-                marketCap: null, // Disabled due to Yahoo v10 restrictions
+        const dataRes = await request(url, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Cookie': session.cookie,
             },
-            defaultKeyStatistics: {},
-            summaryDetail: {},
-            financialData: {}
-        };
+        });
 
-        // Aggressively cache the response at the Vercel Edge
-        res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=300');
-        res.status(200).json(mappedData);
+        const rawText = await dataRes.body.text();
+
+        if (dataRes.statusCode === 401) {
+            // Crumb expired, clear cache and retry once
+            cachedSession = null;
+            sessionExpiry = 0;
+            return res.status(401).json({ error: 'Yahoo auth expired, retry' });
+        }
+
+        if (dataRes.statusCode !== 200) {
+            return res.status(dataRes.statusCode).json({ error: `Yahoo returned ${dataRes.statusCode}` });
+        }
+
+        const data = JSON.parse(rawText);
+
+        // Aggressively cache — fundamentals don't change by the second
+        res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+        res.status(200).json(data);
 
     } catch (error) {
-        console.error('Yahoo Setup API error:', error);
+        console.error('Yahoo QuoteSummary v10 error:', error);
+        // Clear session cache on any error
+        cachedSession = null;
+        sessionExpiry = 0;
         res.status(500).json({ error: String(error) });
     }
 }

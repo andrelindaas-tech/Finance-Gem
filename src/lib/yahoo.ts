@@ -89,59 +89,64 @@ export function processChartDataForRecharts(chartData: any) {
 
 /**
  * Fetch key financial stats (P/E, P/B, EPS, Market Cap, etc.)
- * Uses our local Vite backend proxy which runs `yahoo-finance2`.
- * This bypasses CORS and securely handles Yahoo's crumb authentication.
+ * Uses our Vercel serverless function which handles Yahoo's crumb authentication.
  */
 export async function fetchKeyStats(ticker: string) {
     try {
         const response = await fetch(`/api/yfinance2/quoteSummary?ticker=${ticker}`);
 
         if (!response.ok) {
-            console.error(`yahoo-finance2 proxy returned ${response.status}`);
+            console.error(`quoteSummary proxy returned ${response.status}`);
             throw new Error(`Failed to fetch key stats: ${response.statusText}`);
         }
 
         const data = await response.json();
         if (!data) return null;
 
-        const stats = data.defaultKeyStatistics || {};
-        const financial = data.financialData || {};
-        const summary = data.summaryDetail || {};
-        const priceData = data.price || {};
+        // v10 quoteSummary wraps results in quoteSummary.result[0]
+        const result = data.quoteSummary?.result?.[0] || data;
+
+        const stats = result.defaultKeyStatistics || {};
+        const financial = result.financialData || {};
+        const summary = result.summaryDetail || {};
+        const priceData = result.price || {};
+
+        // Helper: Yahoo v10 wraps numbers as {raw: 123, fmt: "123"}
+        const raw = (v: any) => v?.raw ?? v ?? null;
 
         return {
             // Valuation
-            marketCap: priceData.marketCap || summary.marketCap || null,
-            pe: summary.trailingPE || stats.trailingPE || null,
-            forwardPe: summary.forwardPE || stats.forwardPE || null,
-            pb: stats.priceToBook || null,
-            ps: stats.priceToSalesTrailing12Months || null,
-            peg: stats.pegRatio || null,
+            marketCap: raw(priceData.marketCap) || raw(summary.marketCap) || null,
+            pe: raw(summary.trailingPE) || raw(stats.trailingPE) || null,
+            forwardPe: raw(summary.forwardPE) || raw(stats.forwardPE) || null,
+            pb: raw(stats.priceToBook) || null,
+            ps: raw(stats.priceToSalesTrailing12Months) || null,
+            peg: raw(stats.pegRatio) || null,
 
             // Per Share
-            eps: financial.earningsPerShare || stats.trailingEps || null,
-            bookValue: stats.bookValue || null,
+            eps: raw(financial.earningsPerShare) || raw(stats.trailingEps) || null,
+            bookValue: raw(stats.bookValue) || null,
 
             // Dividends
-            dividendYield: summary.dividendYield || summary.trailingAnnualDividendYield || null,
-            dividendPerShare: summary.dividendRate || summary.trailingAnnualDividendRate || null,
+            dividendYield: raw(summary.dividendYield) || raw(summary.trailingAnnualDividendYield) || null,
+            dividendPerShare: raw(summary.dividendRate) || raw(summary.trailingAnnualDividendRate) || null,
 
             // Revenue / Profitability
-            revenue: financial.totalRevenue || null,
-            ebitda: financial.ebitda || null,
-            profitMargin: financial.profitMargins || null,
+            revenue: raw(financial.totalRevenue) || null,
+            ebitda: raw(financial.ebitda) || null,
+            profitMargin: raw(financial.profitMargins) || null,
 
             // 52-week
-            fiftyTwoWeekHigh: summary.fiftyTwoWeekHigh || null,
-            fiftyTwoWeekLow: summary.fiftyTwoWeekLow || null,
+            fiftyTwoWeekHigh: raw(summary.fiftyTwoWeekHigh) || null,
+            fiftyTwoWeekLow: raw(summary.fiftyTwoWeekLow) || null,
 
             // Other
-            beta: summary.beta || stats.beta || null,
+            beta: raw(summary.beta) || raw(stats.beta) || null,
             shortName: priceData.shortName || priceData.longName || ticker,
             currency: priceData.currency || financial.financialCurrency || 'NOK',
         };
     } catch (error) {
-        console.error('Yahoo Finance 2 Proxy Error (Key Stats):', error);
+        console.error('Yahoo QuoteSummary Proxy Error (Key Stats):', error);
         return null;
     }
 }
