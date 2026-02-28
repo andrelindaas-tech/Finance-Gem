@@ -1,21 +1,25 @@
-const https = require('https');
+import https from 'https';
 
-// Cache crumb+cookie across warm invocations
+// Cache crumb+cookie across warm serverless invocations
 let cachedSession = null;
 let sessionExpiry = 0;
 
-function httpsGet(url, headers) {
+function httpsGet(url, headers = {}) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
         const req = https.request({
             hostname: parsedUrl.hostname,
             path: parsedUrl.pathname + parsedUrl.search,
             method: 'GET',
-            headers: headers || {},
+            headers,
         }, (res) => {
             let body = '';
             res.on('data', d => body += d);
-            res.on('end', () => resolve({ statusCode: res.statusCode, headers: res.headers, body }));
+            res.on('end', () => resolve({
+                statusCode: res.statusCode,
+                headers: res.headers,
+                body,
+            }));
         });
         req.on('error', reject);
         req.end();
@@ -23,44 +27,42 @@ function httpsGet(url, headers) {
 }
 
 async function getYahooCrumb() {
-    // Return cached session if still valid
     if (cachedSession && Date.now() < sessionExpiry) {
         return cachedSession;
     }
 
-    // Step 1: Hit fc.yahoo.com — a lightweight cookie-setting endpoint
-    // Unlike finance.yahoo.com, this doesn't send massive tracking headers
-    const cookieRes = await httpsGet('https://fc.yahoo.com', {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    });
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+    // Step 1: Hit fc.yahoo.com to get a lightweight session cookie
+    // fc.yahoo.com typically returns a 404 body but DOES set the A3 cookie we need
+    const cookieRes = await httpsGet('https://fc.yahoo.com', { 'User-Agent': ua });
 
     const setCookies = cookieRes.headers['set-cookie'];
     if (!setCookies) {
-        throw new Error('No cookies received from fc.yahoo.com, status: ' + cookieRes.statusCode);
+        throw new Error(`No cookies from fc.yahoo.com (status ${cookieRes.statusCode})`);
     }
 
     const cookieArray = Array.isArray(setCookies) ? setCookies : [setCookies];
     const cookieString = cookieArray.map(c => c.split(';')[0]).join('; ');
 
-    // Step 2: Get crumb using the cookie
+    // Step 2: Get crumb
     const crumbRes = await httpsGet('https://query2.finance.yahoo.com/v1/test/getcrumb', {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': ua,
         'Cookie': cookieString,
     });
 
     const crumb = crumbRes.body.trim();
-    if (!crumb || crumb.includes('Unauthorized') || crumb.includes('<') || crumbRes.statusCode !== 200) {
-        throw new Error('Failed to obtain crumb, status ' + crumbRes.statusCode + ': ' + crumb.substring(0, 100));
+    if (!crumb || crumbRes.statusCode !== 200 || crumb.startsWith('<')) {
+        throw new Error(`Crumb failed (status ${crumbRes.statusCode}): ${crumb.substring(0, 80)}`);
     }
 
     cachedSession = { cookie: cookieString, crumb };
-    sessionExpiry = Date.now() + 5 * 60 * 1000; // Cache 5 min
+    sessionExpiry = Date.now() + 5 * 60 * 1000;
     return cachedSession;
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
     const { ticker } = req.query;
-
     if (!ticker) {
         return res.status(400).json({ error: 'Ticker is required' });
     }
@@ -68,7 +70,6 @@ module.exports = async function handler(req, res) {
     try {
         const session = await getYahooCrumb();
 
-        // Fetch v10 quoteSummary with crumb auth
         const modules = 'defaultKeyStatistics,summaryDetail,financialData,price';
         const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}&crumb=${encodeURIComponent(session.crumb)}`;
 
@@ -80,16 +81,19 @@ module.exports = async function handler(req, res) {
         if (dataRes.statusCode === 401) {
             cachedSession = null;
             sessionExpiry = 0;
-            return res.status(401).json({ error: 'Yahoo auth expired, please retry' });
+            return res.status(401).json({ error: 'Yahoo auth expired, retry' });
         }
 
         if (dataRes.statusCode !== 200) {
-            return res.status(dataRes.statusCode).json({ error: `Yahoo returned ${dataRes.statusCode}: ${dataRes.body.substring(0, 200)}` });
+            return res.status(dataRes.statusCode).json({
+                error: `Yahoo returned ${dataRes.statusCode}`,
+                body: dataRes.body.substring(0, 200),
+            });
         }
 
         const data = JSON.parse(dataRes.body);
 
-        // Aggressively cache — fundamentals don't change by the second
+        // Cache fundamentals aggressively (5 min cache, 10 min stale)
         res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
         res.status(200).json(data);
 
@@ -99,4 +103,4 @@ module.exports = async function handler(req, res) {
         sessionExpiry = 0;
         res.status(500).json({ error: String(error) });
     }
-};
+}
