@@ -9,9 +9,12 @@ interface AssetCardProps {
     changeAmount: number;
     changePercent: number;
     weight: number;
+    totalReturnAmount?: number;
+    totalReturnPercent?: number;
+    currency?: string;
 }
 
-export function AssetCard({ id, ticker, name, value, changeAmount, changePercent, weight }: AssetCardProps) {
+export function AssetCard({ id, ticker, name, value, changeAmount, changePercent, weight, totalReturnAmount, totalReturnPercent, currency = 'NOK' }: AssetCardProps) {
     const navigate = useNavigate();
     const isPositive = changeAmount >= 0;
 
@@ -24,22 +27,32 @@ export function AssetCard({ id, ticker, name, value, changeAmount, changePercent
             <div className="flex flex-col">
                 <div className="flex items-center space-x-2">
                     <span className="font-bold text-lg">{ticker}</span>
-                    <span className="text-muted-foreground text-sm bg-black/20 px-2 py-0.5 rounded-md">{weight}%</span>
+                    <span className="text-muted-foreground text-sm bg-black/20 px-2 py-0.5 rounded-md">{weight.toFixed(1)}%</span>
                 </div>
                 <span className="text-muted-foreground text-sm">{name}</span>
             </div>
 
             <div className="flex flex-col items-start sm:items-end">
-                <span className="font-semibold text-lg">{value.toLocaleString('nb-NO')} NOK</span>
-                <div className="flex items-center space-x-1.5 mt-0.5">
-                    <span className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}>
-                        {isPositive ? '+' : ''}{changeAmount.toLocaleString('nb-NO')}
-                    </span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${isPositive ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
-                        }`}>
-                        {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
-                    </span>
-                </div>
+                <span className="font-semibold text-lg">{value.toLocaleString('nb-NO', { maximumFractionDigits: 0 })} {currency}</span>
+                {totalReturnAmount !== undefined && totalReturnPercent !== undefined ? (
+                    <div className="flex items-center space-x-1.5 mt-0.5">
+                        <span className={`text-sm font-medium ${totalReturnAmount >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {totalReturnAmount >= 0 ? '+' : ''}{totalReturnAmount.toLocaleString('nb-NO', { maximumFractionDigits: 0 })}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${totalReturnAmount >= 0 ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                            {totalReturnPercent >= 0 ? '+' : ''}{totalReturnPercent.toFixed(2)}%
+                        </span>
+                    </div>
+                ) : (
+                    <div className="flex items-center space-x-1.5 mt-0.5">
+                        <span className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}>
+                            {isPositive ? '+' : ''}{changeAmount.toLocaleString('nb-NO')}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${isPositive ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
+                            {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
+                        </span>
+                    </div>
+                )}
             </div>
         </motion.div>
     );

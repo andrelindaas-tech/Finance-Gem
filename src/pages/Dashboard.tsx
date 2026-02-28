@@ -76,6 +76,11 @@ export default function Dashboard() {
             const dayChangeAmount = (quote?.regularMarketChange || 0) * asset.quantity;
             const dayChangePercent = quote?.regularMarketChangePercent || 0;
 
+            // Total return since purchase (GAV vs current)
+            const totalInvested = asset.average_buy_price * asset.quantity;
+            const totalReturnAmount = value - totalInvested;
+            const totalReturnPercent = totalInvested > 0 ? (totalReturnAmount / totalInvested) * 100 : 0;
+
             totalValue += value;
             totalDayChange += dayChangeAmount;
 
@@ -87,6 +92,8 @@ export default function Dashboard() {
                 changeAmount: dayChangeAmount,
                 changePercent: dayChangePercent,
                 currency: quote?.currency || 'NOK',
+                totalReturnAmount,
+                totalReturnPercent,
                 // For internal components if needed later:
                 shares: asset.quantity,
                 gav: asset.average_buy_price
