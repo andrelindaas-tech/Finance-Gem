@@ -153,7 +153,7 @@ ANALYTISKE REGLER FOR VERDSETTELSE (KRITISK):
    - Sjømat: Normal P/E 15-20.
    - Shipping/Offshore: Normal P/E 4-8. P/B og utbytte er primære metrikker.
    - Konsum/Industri/Tech: Normal P/E 12-18 (Tech kan strekke seg til 20-30).
-2. Vekstsjekk: Sammenlign 'PE' med 'FwdPE'. Hvis FwdPE er lavere enn PE, identifiser dette som en indikator på forventet inntjeningsvekst.
+2. Inntjeningstrend (Viktig matematisk regel): Sammenlign 'PE' med 'FwdPE'. Hvis FwdPE er HØYERE enn PE, forventes inntjeningen å FALLE (krympende profitt, vanlig ved sykliske topper). Hvis FwdPE er LAVERE enn PE, forventes inntjeningen å VOKSE. Du MÅ korrekt oppgi om fremtidig inntjening ekspanderer eller kontraherer basert på dette omvendte matematiske forholdet.
 3. Verdifellesjekk (Value Trap): Evaluer utbytte ('Div') mot '52w' range. Et utbytte over 10% kombinert med en pris nær 52-ukers bunn er et rødt flagg (verdifelle). En solid utbytteavkastning kombinert med en pris nær 52-ukers topp indikerer solid kontantgenerering.
 4. Sikkerhetsmargin: Søk aktivt etter 'PB' (Pris/Bok) nær eller under 1.0, spesielt for bank/finans og shipping.
 
