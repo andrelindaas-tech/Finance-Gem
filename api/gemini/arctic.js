@@ -1,5 +1,6 @@
+import https from 'https';
+
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const YAHOO_QUOTE_URL = 'https://query1.finance.yahoo.com/v7/finance/quote';
 
 // 40 major Oslo Børs (OSEBX) tickers — mix of large, mid, and some smaller cap
 const OSEBX_TICKERS = [
@@ -22,32 +23,94 @@ const OSEBX_TICKERS = [
     'BWO.OL', 'BGBIO.OL', 'NONG.OL', 'RECSI.OL', 'PARB.OL',
 ];
 
-/**
- * Fetch real-time fundamentals for all OSEBX tickers in one batch call.
- * Returns a compact string for Gemini + the raw data for filtering.
- */
-async function fetchOsebxData() {
-    const symbols = OSEBX_TICKERS.join(',');
-    const url = `${YAHOO_QUOTE_URL}?symbols=${symbols}`;
+// ── Yahoo auth (same pattern as quoteSummary.js) ──
 
-    const response = await fetch(url, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
+let cachedSession = null;
+let sessionExpiry = 0;
+
+function httpsGet(url, headers = {}) {
+    return new Promise((resolve, reject) => {
+        const parsedUrl = new URL(url);
+        const req = https.request({
+            hostname: parsedUrl.hostname,
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: 'GET',
+            headers,
+        }, (res) => {
+            let body = '';
+            res.on('data', d => body += d);
+            res.on('end', () => resolve({
+                statusCode: res.statusCode,
+                headers: res.headers,
+                body,
+            }));
+        });
+        req.on('error', reject);
+        req.end();
     });
+}
 
-    if (!response.ok) {
-        throw new Error(`Yahoo Finance returned ${response.status}`);
+async function getYahooCrumb() {
+    if (cachedSession && Date.now() < sessionExpiry) {
+        return cachedSession;
     }
 
-    const data = await response.json();
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+    // Get session cookie from fc.yahoo.com
+    const cookieRes = await httpsGet('https://fc.yahoo.com', { 'User-Agent': ua });
+    const setCookies = cookieRes.headers['set-cookie'];
+    if (!setCookies) throw new Error(`No cookies from fc.yahoo.com`);
+
+    const cookieArray = Array.isArray(setCookies) ? setCookies : [setCookies];
+    const cookieString = cookieArray.map(c => c.split(';')[0]).join('; ');
+
+    // Get crumb
+    const crumbRes = await httpsGet('https://query2.finance.yahoo.com/v1/test/getcrumb', {
+        'User-Agent': ua,
+        'Cookie': cookieString,
+    });
+
+    const crumb = crumbRes.body.trim();
+    if (!crumb || crumbRes.statusCode !== 200 || crumb.startsWith('<')) {
+        throw new Error(`Crumb failed: ${crumb.substring(0, 80)}`);
+    }
+
+    cachedSession = { cookie: cookieString, crumb, ua };
+    sessionExpiry = Date.now() + 5 * 60 * 1000;
+    return cachedSession;
+}
+
+// ── Data fetching ──
+
+async function fetchOsebxData() {
+    const session = await getYahooCrumb();
+    const symbols = OSEBX_TICKERS.join(',');
+    const url = `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&crumb=${encodeURIComponent(session.crumb)}`;
+
+    const res = await httpsGet(url, {
+        'User-Agent': session.ua,
+        'Cookie': session.cookie,
+    });
+
+    if (res.statusCode === 401) {
+        cachedSession = null;
+        sessionExpiry = 0;
+        throw new Error('Yahoo auth expired');
+    }
+
+    if (res.statusCode !== 200) {
+        throw new Error(`Yahoo returned ${res.statusCode}: ${res.body.substring(0, 100)}`);
+    }
+
+    const data = JSON.parse(res.body);
     const quotes = data.quoteResponse?.result || [];
 
-    // Pre-filter: only include stocks with actual financial data
+    // Pre-filter: only stocks with actual financial data
     const filtered = quotes.filter(q =>
         q.regularMarketPrice > 0 &&
         q.symbol &&
-        (q.trailingPE || q.priceToBook || q.dividendYield)
+        (q.trailingPE || q.priceToBook || q.trailingAnnualDividendYield)
     );
 
     // Build compact data lines for Gemini
@@ -72,6 +135,8 @@ async function fetchOsebxData() {
 
     return { lines, count: filtered.length };
 }
+
+// ── Prompt ──
 
 function buildPrompt(dataLines) {
     const today = new Date().toISOString().split('T')[0];
@@ -110,9 +175,11 @@ SVAR I NØYAKTIG DETTE JSON-FORMATET:
 VIKTIG:
 - Sorter picks med de mest undervurderte først
 - Skriv alt på norsk
-- Reasoning MÅ referere til faktiske tall fra dataen ovenfor  
+- Reasoning MÅ referere til faktiske tall fra dataen ovenfor
 - Returner KUN gyldig JSON`;
 }
+
+// ── Handler ──
 
 export default async function handler(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -122,12 +189,14 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Step 1: Fetch real Yahoo data for all OSEBX tickers
+        // Step 1: Fetch real Yahoo data with cookie auth
         const { lines, count } = await fetchOsebxData();
 
         if (lines.length === 0) {
             return res.status(502).json({ error: 'Could not fetch any stock data from Yahoo' });
         }
+
+        console.log(`Fetched ${count} tickers, ${lines.length} with financial data`);
 
         // Step 2: Build data-driven prompt
         const prompt = buildPrompt(lines);
@@ -171,7 +240,7 @@ export default async function handler(req, res) {
 
         const parsed = JSON.parse(cleaned);
 
-        // Add metadata about the data source
+        // Add metadata
         parsed.meta = {
             tickersAnalyzed: count,
             dataSource: 'Yahoo Finance (live)',
@@ -183,7 +252,9 @@ export default async function handler(req, res) {
         res.status(200).json(parsed);
 
     } catch (error) {
-        console.error('Gemini proxy error:', error);
+        console.error('Innsikt error:', error);
+        cachedSession = null;
+        sessionExpiry = 0;
         res.status(500).json({ error: String(error) });
     }
 }
