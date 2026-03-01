@@ -2,25 +2,24 @@ import https from 'https';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-// 40 major Oslo Børs (OSEBX) tickers — mix of large, mid, and some smaller cap
+// 45 major Oslo Børs (OSEBX) tickers — mix of large, mid, and some smaller cap
 const OSEBX_TICKERS = [
     // Energy & Oil
-    'EQNR.OL', 'AKRBP.OL', 'VAR.OL', 'AKER.OL', 'BAKKA.OL',
+    'EQNR.OL', 'AKRBP.OL', 'VAR.OL', 'AKER.OL',
     // Shipping & Offshore
-    'FRO.OL', 'HAFNI.OL', 'SUBC.OL', 'DOFG.OL', 'FLNG.OL',
+    'FRO.OL', 'HAFNI.OL', 'SUBC.OL', 'DOFG.OL', 'FLNG.OL', 'WAWI.OL', 'MPCC.OL',
     // Seafood
-    'MOWI.OL', 'SALM.OL', 'LSG.OL', 'AUSS.OL',
+    'MOWI.OL', 'SALM.OL', 'LSG.OL', 'AUSS.OL', 'BAKKA.OL',
     // Finance & Insurance
-    'DNB.OL', 'MORG.OL', 'SRBNK.OL', 'GJFS.OL',
+    'DNB.OL', 'MORG.OL', 'SB1NO.OL', 'GJFS.OL', 'PROT.OL', 'NONG.OL', 'PARB.OL', 'STB.OL', 'MING.OL',
     // Telecom & Tech
-    'TEL.OL', 'NOD.OL', 'OPER.OL', 'CRAYN.OL',
+    'TEL.OL', 'NOD.OL', 'CRAYN.OL', 'BOUV.OL',
     // Consumer & Industry
-    'ORK.OL', 'SCATC.OL', 'NHY.OL', 'YAR.OL', 'TOM.OL',
+    'ORK.OL', 'SCATC.OL', 'NHY.OL', 'YAR.OL', 'TOM.OL', 'EPR.OL', 'BRG.OL',
     // Real Estate & Misc
     'ENTRA.OL', 'OLT.OL', 'KOG.OL',
     // Mid-cap with upside potential
-    'PROT.OL', 'NAS.OL', 'KAHOT.OL', 'AUTO.OL', 'BELCO.OL',
-    'BWO.OL', 'BGBIO.OL', 'NONG.OL', 'RECSI.OL', 'PARB.OL',
+    'NAS.OL', 'AUTO.OL', 'BWE.OL', 'BWO.OL', 'RECSI.OL', 'AKSO.OL',
 ];
 
 // ── Yahoo auth (same pattern as quoteSummary.js) ──
