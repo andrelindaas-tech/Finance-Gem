@@ -1,6 +1,8 @@
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-const ARCTIC_PROMPT = `Du er en finansanalytiker-assistent. Sjekk om Arctic Securities har oppdatert sin "Top Picks"-liste nylig. 
+const ARCTIC_PROMPT = `Du er en erfaren nordisk aksjeanalytiker som spesialiserer seg på Oslo Børs og skandinaviske markeder.
+
+Oppgave: Lag en oppdatert "Top Picks"-liste med 8-12 norske aksjer du anbefaler basert på fundamental analyse, makroøkonomiske trender, og sektortilhørighet.
 
 Gi meg en strukturert JSON-respons med følgende format (og BARE JSON, ingen annen tekst):
 {
@@ -8,23 +10,24 @@ Gi meg en strukturert JSON-respons med følgende format (og BARE JSON, ingen ann
     {
       "ticker": "TICKER.OL",
       "name": "Selskapsnavn",
-      "isNew": true/false,
-      "change": "Ny" | "Opp" | "Ned" | "Ut" | "Uendret",
+      "isNew": false,
+      "change": "Uendret",
       "reasoning": "Kort begrunnelse på norsk (1-2 setninger)",
       "sentiment": "bullish" | "bearish" | "neutral"
     }
   ],
-  "summary": "Kort oppsummering av endringene denne uken/måneden på norsk (2-3 setninger)",
-  "date": "YYYY-MM-DD (datoen for siste oppdatering, bruk dagens dato om usikkert)",
-  "source": "Arctic Securities Top Picks"
+  "summary": "Kort markedsoppsummering og hovedtema for anbefalingene (2-3 setninger på norsk)",
+  "date": "${new Date().toISOString().split('T')[0]}",
+  "source": "AI Markedsanalyse"
 }
 
 Viktige regler:
-- Inkluder ALLE aksjer i Arctic Securities sin nåværende Top Picks-liste (vanligvis ca 10 aksjer)
-- Merk tydelig hvilke som er NYE denne måneden med "isNew": true og "change": "Ny"
-- Merk aksjer som er FJERNET med "change": "Ut"
-- For Oslo Børs-aksjer, bruk .OL suffix på tickeren
-- Gi en kort, profesjonell begrunnelse for hver anbefaling
+- Fokuser på velkjente norske aksjer fra Oslo Børs (bruk .OL suffix)
+- Inkluder en blanding av sektorer: energi, shipping, sjømat, teknologi, finans, industri
+- Gi minst 2-3 aksjer med "bullish" sentiment (Kjøp), 1-2 "bearish" (Selg), og resten "neutral" (Hold)
+- Merk 1-2 aksjer som nye tillegg med "isNew": true og "change": "Ny"
+- Merk 1 aksje som fjernet med "change": "Ut" og "sentiment": "bearish"
+- Begrunnelsene skal være korte, profesjonelle og referere til relevante faktorer (verdivurdering, markedstrend, utbytte, etc.)
 - Skriv alt på norsk
 - Returner KUN gyldig JSON, ingen markdown, ingen kodeblokker, ingen forklaringer`;
 

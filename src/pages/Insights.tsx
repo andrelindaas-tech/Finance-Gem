@@ -137,7 +137,7 @@ export default function Insights() {
             <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Innsikt</h1>
-                    <p className="text-muted-foreground mt-1">AI-drevet markedsanalyse fra Arctic Securities</p>
+                    <p className="text-muted-foreground mt-1">AI-drevet markedsanalyse for Oslo Børs</p>
                 </div>
                 <button
                     onClick={handleRefresh}
