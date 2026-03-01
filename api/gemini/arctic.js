@@ -139,20 +139,31 @@ async function fetchOsebxData() {
 
 function buildPrompt(dataLines) {
     const today = new Date().toISOString().split('T')[0];
-    return `Du er en erfaren verdiinvestor og nordisk aksjeanalytiker. Du får nå FAKTISKE sanntids-data fra Oslo Børs.
+    return `Du er en strengt kvantitativ verdiinvestor og nordisk aksjeanalytiker. Du får nå faktiske sanntidsdata fra Oslo Børs.
 
-OPPGAVE: Analyser disse ${dataLines.length} aksjene og identifiser de mest UNDERVURDERTE basert på verdsettelsesmetrikkene.
+OPPGAVE: Analyser disse ${dataLines.length} aksjene og identifiser de mest under- og overvurderte selskapene.
 
 DATA (format: Ticker|Navn|Pris|Endring|PE|FwdPE|PB|Utbytte|MarkedsCap|52ukers-range):
 ${dataLines.join('\n')}
 
-ANALYSEREGLER:
-- Velg 8-12 aksjer som er mest interessante for en verdiinvestor
-- Forklar HVORFOR basert på de faktiske tallene (f.eks. "PE på 7.0 er langt under sektorsnitt")
-- Sammenlign med sektorgjennomsnitt der relevant
-- Vurder utbytteavkastning, P/E, P/B, og 52-ukers posisjon
-- Aksjer nær 52-ukers bunn med sterke fundamentaler er spesielt interessante
-- Merk 2-3 som "bullish" (sterkest kjøp), resten som "neutral" (hold/moderat), og 1-2 som "bearish" (oververdsatte)
+ANALYTISKE REGLER FOR VERDSETTELSE (KRITISK):
+1. Sektorrelativ verdsettelse: Du MÅ evaluere multipler basert på disse Oslo Børs-normalene:
+   - Finans/Bank: Normal P/E 8-12. Mål P/B < 1.0.
+   - Energi: Normal P/E 6-10.
+   - Sjømat: Normal P/E 15-20.
+   - Shipping/Offshore: Normal P/E 4-8. P/B og utbytte er primære metrikker.
+   - Konsum/Industri/Tech: Normal P/E 12-18 (Tech kan strekke seg til 20-30).
+2. Vekstsjekk: Sammenlign 'PE' med 'FwdPE'. Hvis FwdPE er lavere enn PE, identifiser dette som en indikator på forventet inntjeningsvekst.
+3. Verdifellesjekk (Value Trap): Evaluer utbytte ('Div') mot '52w' range. Et utbytte over 10% kombinert med en pris nær 52-ukers bunn er et rødt flagg (verdifelle). En solid utbytteavkastning kombinert med en pris nær 52-ukers topp indikerer solid kontantgenerering.
+4. Sikkerhetsmargin: Søk aktivt etter 'PB' (Pris/Bok) nær eller under 1.0, spesielt for bank/finans og shipping.
+
+STRENGE UTDATAKRAV FOR KONSEKVENSER:
+- Maksimalt 3 setninger per aksje for "reasoning".
+- Tonen MÅ være strengt objektiv, tørr, og analytisk. Unngå alt hyperbolsk, emosjonelt eller rådgivende ("vi anbefaler") språk.
+- Du MÅ uttrykkelig sitere de nøyaktige tallene fra datastrengen for matematisk å forsvare din konklusjon (f.eks., "Aksjen handles til en P/B på 0.8 med en FwdPE på 8.5").
+- Velg de 8-12 aksjene med sterkest matematisk case.
+- Merk 2-3 aksjer med underliggende vekst/verdi som "bullish", resten som "neutral", og 1-2 røde flagg (verdifeller/overvurdert) som "bearish".
+- IKKE ENDRE det eksisterende JSON-formatet.
 
 SVAR I NØYAKTIG DETTE JSON-FORMATET:
 {
@@ -162,20 +173,18 @@ SVAR I NØYAKTIG DETTE JSON-FORMATET:
       "name": "Selskapsnavn",
       "isNew": false,
       "change": "Uendret",
-      "reasoning": "2-3 setninger på norsk med referanse til faktiske tall fra dataen",
+      "reasoning": "Maks 3 analytiske setninger på norsk. Referer til faktiske tall.",
       "sentiment": "bullish"
     }
   ],
-  "summary": "3-4 setninger markedsoversikt og hovedfunn fra analysen på norsk. Nevn nøkkeltrender og de sterkeste signalene.",
+  "summary": "Maks 4 setninger markedsoversikt på norsk, basert utelukkende på de matematiske trendene i datasettet.",
   "date": "${today}",
-  "source": "AI Verdianalyse"
+  "source": "Kvantitativ Modell"
 }
 
 VIKTIG:
-- Sorter picks med de mest undervurderte først
-- Skriv alt på norsk
-- Reasoning MÅ referere til faktiske tall fra dataen ovenfor
-- Returner KUN gyldig JSON`;
+- Skriv alt på norsk.
+- Returner KUN gyldig JSON, ingen introduksjon eller forklaringer.`;
 }
 
 // ── Handler ──
