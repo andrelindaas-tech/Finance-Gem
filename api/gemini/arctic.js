@@ -1,4 +1,4 @@
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 const ARCTIC_PROMPT = `Du er en finansanalytiker-assistent. Sjekk om Arctic Securities har oppdatert sin "Top Picks"-liste nylig. 
 
