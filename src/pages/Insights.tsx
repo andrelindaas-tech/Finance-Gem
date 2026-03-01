@@ -84,7 +84,7 @@ export default function Insights() {
                 .from('insights_feed')
                 .select('*')
                 .eq('user_id', user.id)
-                .eq('broker_name', 'Arctic Securities')
+                .eq('broker_name', 'AI Verdianalyse')
                 .order('created_at', { ascending: false })
                 .limit(1);
 
@@ -119,7 +119,7 @@ export default function Insights() {
             if (user) {
                 await supabase.from('insights_feed').insert({
                     user_id: user.id,
-                    broker_name: 'Arctic Securities',
+                    broker_name: 'AI Verdianalyse',
                     ai_summary: JSON.stringify(result),
                     sentiment: result.picks.filter(p => p.sentiment === 'bullish').length > result.picks.length / 2 ? 'bullish' : 'neutral',
                 });
@@ -225,7 +225,7 @@ export default function Insights() {
                     <Sparkles className="w-10 h-10 text-muted-foreground/30 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Ingen oppdateringer enda</h3>
                     <p className="text-muted-foreground text-sm mb-6 max-w-sm mx-auto">
-                        Trykk på "Oppdater Arctic" for å hente de nyeste aksje&shy;anbefalingene fra Arctic Securities.
+                        Trykk på "Oppdater Analyse" for å kjøre AI-drevet verdianalyse av Oslo Børs.
                     </p>
                     <button
                         onClick={handleRefresh}
