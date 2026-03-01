@@ -145,7 +145,7 @@ export default function Insights() {
                     className="flex items-center space-x-2 bg-primary text-primary-foreground font-semibold px-5 py-3 rounded-full hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                 >
                     <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    <span>{isLoading ? 'Henter...' : 'Oppdater Arctic'}</span>
+                    <span>{isLoading ? 'Analyserer...' : 'Oppdater Analyse'}</span>
                 </button>
             </header>
 
